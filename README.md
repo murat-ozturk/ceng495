@@ -1,6 +1,8 @@
 # CENG495 HW1
 Programming Language Used: Java
 
+Vaadin 8 framework is used for UI components. Google zxing library is used to create and read QR files. Upload component is a custom component for Vaadin framework.(Component github link: https://github.com/ssindelar/vaadin-droporchoose-upload)
+
 URL of the app: https://webapp-190321155457.azurewebsites.net/
 
 Site contains 2 layout:
