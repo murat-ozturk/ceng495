@@ -37,6 +37,7 @@ import com.vaadin.ui.ComboBox;
 import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.Image;
 import com.vaadin.ui.Label;
+import com.vaadin.ui.Notification;
 import com.vaadin.ui.TextField;
 import com.vaadin.ui.UI;
 import com.vaadin.ui.VerticalLayout;
@@ -48,9 +49,6 @@ import server.droporchoose.UploadComponent;
 public class MainUI extends UI {
 
 	private Image image;
-	private HorizontalLayout mainLayout;
-	private HorizontalLayout createLayout;
-	private VerticalLayout readLayout;
 	private ComboBox<COLOR> cbBackground;
 	private ComboBox<COLOR> cbCodeColor;
 	private File file;
@@ -59,8 +57,8 @@ public class MainUI extends UI {
 	protected void init(VaadinRequest request) {
 
 		VerticalLayout imageLayout = new VerticalLayout();
-		mainLayout = new HorizontalLayout();
-		readLayout = new VerticalLayout();
+		HorizontalLayout mainLayout = new HorizontalLayout();
+		VerticalLayout readLayout = new VerticalLayout();
 
 		UploadComponent upload = new UploadComponent();
 		upload.setReceivedCallback(this::uploadReceived);
@@ -73,7 +71,14 @@ public class MainUI extends UI {
 				Window window = new Window("QR Data");
 
 				try {
+					if (file == null || file.length() == 0) {
+						Notification.show("Please upload a QR file");
+						return;
+					}
 					String data = decodeQRCode(file);
+					if (data == null) {
+						return;
+					}
 					Label lblData = new Label(data);
 
 					window.setContent(lblData);
@@ -81,7 +86,7 @@ public class MainUI extends UI {
 					window.setModal(true);
 
 					getUI().addWindow(window);
-					
+
 					java.nio.file.Files.delete(file.toPath());
 				} catch (IOException e) {
 					e.printStackTrace();
@@ -89,7 +94,7 @@ public class MainUI extends UI {
 
 			}
 		});
-		
+
 		readLayout.addComponents(upload, btnRead);
 
 		TextField tfName = new TextField("Name");
@@ -126,7 +131,7 @@ public class MainUI extends UI {
 
 		VerticalLayout inputLayout = new VerticalLayout();
 
-		createLayout = new HorizontalLayout();
+		HorizontalLayout createLayout = new HorizontalLayout();
 
 		inputLayout.addComponents(tfName, cbCodeColor, cbBackground, btnCreate);
 
@@ -173,7 +178,7 @@ public class MainUI extends UI {
 			Result result = new MultiFormatReader().decode(bitmap);
 			return result.getText();
 		} catch (NotFoundException e) {
-			System.out.println("There is no QR code in the image");
+			Notification.show("Image you provided is not a QR image");
 			return null;
 		}
 	}
@@ -185,6 +190,7 @@ public class MainUI extends UI {
 	@WebServlet(value = "/*", asyncSupported = true)
 	@VaadinServletConfiguration(productionMode = true, ui = MainUI.class, heartbeatInterval = 30, closeIdleSessions = false)
 	public static class Servlet extends VaadinServlet {
+
 	}
 
 }
