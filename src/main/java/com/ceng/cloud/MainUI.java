@@ -3,17 +3,26 @@ package com.ceng.cloud;
 import java.awt.image.BufferedImage;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.InputStream;
+import java.nio.file.Path;
 
 import javax.imageio.ImageIO;
 import javax.servlet.annotation.WebServlet;
 
 import com.google.zxing.BarcodeFormat;
+import com.google.zxing.BinaryBitmap;
+import com.google.zxing.LuminanceSource;
+import com.google.zxing.MultiFormatReader;
+import com.google.zxing.NotFoundException;
+import com.google.zxing.Result;
 import com.google.zxing.WriterException;
+import com.google.zxing.client.j2se.BufferedImageLuminanceSource;
 import com.google.zxing.client.j2se.MatrixToImageConfig;
 import com.google.zxing.client.j2se.MatrixToImageWriter;
 import com.google.zxing.common.BitMatrix;
+import com.google.zxing.common.HybridBinarizer;
 import com.google.zxing.qrcode.QRCodeWriter;
 import com.vaadin.annotations.VaadinServletConfiguration;
 import com.vaadin.server.StreamResource;
@@ -25,13 +34,15 @@ import com.vaadin.ui.Button;
 import com.vaadin.ui.Button.ClickEvent;
 import com.vaadin.ui.Button.ClickListener;
 import com.vaadin.ui.ComboBox;
-import com.vaadin.ui.Component;
 import com.vaadin.ui.HorizontalLayout;
 import com.vaadin.ui.Image;
+import com.vaadin.ui.Label;
 import com.vaadin.ui.TextField;
 import com.vaadin.ui.UI;
-import com.vaadin.ui.Upload;
 import com.vaadin.ui.VerticalLayout;
+import com.vaadin.ui.Window;
+
+import server.droporchoose.UploadComponent;
 
 @SpringUI
 public class MainUI extends UI {
@@ -42,13 +53,44 @@ public class MainUI extends UI {
 	private VerticalLayout readLayout;
 	private ComboBox<COLOR> cbBackground;
 	private ComboBox<COLOR> cbCodeColor;
+	private File file;
 
 	@Override
 	protected void init(VaadinRequest request) {
 
 		VerticalLayout imageLayout = new VerticalLayout();
+		mainLayout = new HorizontalLayout();
 		readLayout = new VerticalLayout();
+
+		UploadComponent upload = new UploadComponent();
+		upload.setReceivedCallback(this::uploadReceived);
+
+		Button btnRead = new Button("Read QR");
+		btnRead.addClickListener(new ClickListener() {
+
+			@Override
+			public void buttonClick(ClickEvent event) {
+				Window window = new Window("QR Data");
+
+				try {
+					String data = decodeQRCode(file);
+					Label lblData = new Label(data);
+
+					window.setContent(lblData);
+					window.center();
+					window.setModal(true);
+
+					getUI().addWindow(window);
+					
+					java.nio.file.Files.delete(file.toPath());
+				} catch (IOException e) {
+					e.printStackTrace();
+				}
+
+			}
+		});
 		
+		readLayout.addComponents(upload, btnRead);
 
 		TextField tfName = new TextField("Name");
 		cbBackground = new ComboBox<>("Background Color");
@@ -56,7 +98,7 @@ public class MainUI extends UI {
 		cbBackground.setItemCaptionGenerator(color -> color.getName());
 		cbBackground.setValue(COLOR.WHITE);
 		cbBackground.setEmptySelectionAllowed(false);
-		
+
 		cbCodeColor = new ComboBox<>("Code Color");
 		cbCodeColor.setItems(COLOR.values());
 		cbCodeColor.setItemCaptionGenerator(color -> color.getName());
@@ -69,7 +111,8 @@ public class MainUI extends UI {
 			@Override
 			public void buttonClick(ClickEvent event) {
 				try {
-					image = convertToImage(getQRCodeImage(tfName.getValue(), cbCodeColor.getValue().getColorId(), cbBackground.getValue().getColorId()));
+					image = convertToImage(getQRCodeImage(tfName.getValue(), cbCodeColor.getValue().getColorId(),
+							cbBackground.getValue().getColorId()));
 					imageLayout.removeAllComponents();
 					imageLayout.addComponent(image);
 				} catch (WriterException e) {
@@ -89,7 +132,9 @@ public class MainUI extends UI {
 
 		createLayout.addComponents(inputLayout, imageLayout);
 
-		setContent(createLayout);
+		mainLayout.addComponents(createLayout, readLayout);
+
+		setContent(mainLayout);
 
 	}
 
@@ -118,7 +163,25 @@ public class MainUI extends UI {
 
 		return new Image(null, new StreamResource(streamSource, "streamedSourceFromByteArray"));
 	}
-	
+
+	private static String decodeQRCode(File qrCodeimage) throws IOException {
+		BufferedImage bufferedImage = ImageIO.read(qrCodeimage);
+		LuminanceSource source = new BufferedImageLuminanceSource(bufferedImage);
+		BinaryBitmap bitmap = new BinaryBitmap(new HybridBinarizer(source));
+
+		try {
+			Result result = new MultiFormatReader().decode(bitmap);
+			return result.getText();
+		} catch (NotFoundException e) {
+			System.out.println("There is no QR code in the image");
+			return null;
+		}
+	}
+
+	private void uploadReceived(String fileName, Path path) {
+		file = path.toFile();
+	}
+
 	@WebServlet(value = "/*", asyncSupported = true)
 	@VaadinServletConfiguration(productionMode = true, ui = MainUI.class, heartbeatInterval = 30, closeIdleSessions = false)
 	public static class Servlet extends VaadinServlet {
@@ -127,22 +190,23 @@ public class MainUI extends UI {
 }
 
 enum COLOR {
-	
-	WHITE("White", 0xFFFFFFFF), BLACK("Black", 0xFF000000), RED("Red", 0xFFFF0000), GREEN("Green", 0xFF00FF00), BLUE("Blue", 0xFF0000FF);
-	
+
+	WHITE("White", 0xFFFFFFFF), BLACK("Black", 0xFF000000), RED("Red", 0xFFFF0000), GREEN("Green", 0xFF00FF00),
+	BLUE("Blue", 0xFF0000FF);
+
 	private String name;
 	private int colorId;
-	
-	COLOR(String name, int colorId){
+
+	COLOR(String name, int colorId) {
 		this.name = name;
 		this.colorId = colorId;
 	}
-	
-	String getName(){
+
+	String getName() {
 		return this.name;
 	}
-	
-	int getColorId(){
+
+	int getColorId() {
 		return this.colorId;
 	}
 }
